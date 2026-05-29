@@ -1,0 +1,17 @@
+# Claude (로컬 전용, 공유하지 않음)
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+
+# 환경 변수
+.env
+
+# 파이썬
+__pycache__/
+*.py[cod]
+.venv/
+
+# OS / 에디터
+.DS_Store
+.idea/
+.vscode/
