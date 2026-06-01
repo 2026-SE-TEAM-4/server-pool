@@ -6,8 +6,17 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
+    "psutil>=6",
 ]
 
 # 경량 에이전트. 백엔드와 의존성을 공유하지 않는다.
 [tool.uv]
 package = false
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+# package = false 라 루트가 자동으로 sys.path에 오르지 않으므로, pytest가
+# agent 패키지를 import 할 수 있도록 루트를 명시한다.
+[tool.pytest.ini_options]
+pythonpath = ["."]

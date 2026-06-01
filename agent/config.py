@@ -8,3 +8,8 @@ import os
 
 PORT = int(os.getenv("PORT", "9101"))
 SERVER_ID = int(os.getenv("SERVER_ID", "1"))
+
+# 네트워크 사용률 계산 기준 대역폭(Mbps). 처리량을 이 값 대비 %로 환산한다.
+NET_CAP_MBPS = float(os.getenv("NET_CAP_MBPS", "1000"))
+# 물리 GPU가 없는 시뮬레이션 환경에서 합성 GPU 사용률을 낼지 여부.
+GPU_SIMULATE = os.getenv("GPU_SIMULATE", "true").lower() == "true"
