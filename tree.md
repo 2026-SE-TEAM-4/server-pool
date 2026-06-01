@@ -12,10 +12,10 @@ N대의 관리 대상 서버를 흉내낸다. 각 컨테이너는 `:9101/metrics
 server-pool/
 ├── agent/                     # 에이전트 패키지 (모든 코드는 이 안)
 │   ├── main.py                # FastAPI entrypoint (/metrics, /health)
-│   ├── config.py              # 환경 설정 (SERVER_ID, PORT 등)
+│   ├── config.py              # 환경 설정 (SERVER_ID, PORT, NET_CAP_MBPS, GPU_SIMULATE)
 │   └── collectors/            # 메트릭 수집기 (1 자원 = 1 파일)
-│                              # cpu.py, memory.py, gpu.py ...
-├── tests/                     # 수집기 단위 테스트
+│                              # cpu.py, memory.py, net.py, gpu.py
+├── tests/                     # 수집기 단위 테스트 (test_collectors.py)
 ├── pyproject.toml             # uv 기반 의존성·도구 설정
 ├── Dockerfile                 # 에이전트 단일 이미지
 ├── docker-compose.yml         # N개 인스턴스 기동 (시뮬레이션)
