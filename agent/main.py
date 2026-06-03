@@ -8,6 +8,7 @@
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from agent.collectors.cpu import read_cpu_usage
 from agent.collectors.gpu import read_gpu_usage
@@ -16,6 +17,16 @@ from agent.collectors.net import read_net_usage
 from agent.config import SERVER_ID
 
 app = FastAPI(title=f"server-pool agent #{SERVER_ID}")
+
+# 프론트엔드(React SPA)가 브라우저에서 /metrics를 직접 읽을 수 있게 CORS를 연다.
+# 공개 읽기 전용 엔드포인트라 인증 쿠키가 없으므로 allow_credentials는 켜지 않는다.
+# (와일드카드 origin과 credentials를 함께 켜면 브라우저가 응답을 거부한다.)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")

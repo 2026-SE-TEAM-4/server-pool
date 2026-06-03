@@ -1,13 +1,20 @@
 """CPU 사용률 수집기."""
 
+import random
+
 import psutil
+
+from agent.config import SERVER_ID
+
+_rng = random.Random(SERVER_ID)
 
 
 def read_cpu_usage() -> float:
     """현재 CPU 사용률(%)을 반환한다.
 
-    psutil.cpu_percent(interval=None)은 직전 호출 이후의 평균 사용률을 준다.
-    /metrics는 주기적으로 PULL되므로 폴링 간격 동안의 사용률이 자연스럽게 잡힌다.
-    (첫 호출은 기준점만 잡혀 0.0이 나올 수 있다.)
+    컨테이너들이 같은 호스트를 공유해 psutil 실측값이 서로 거의 같으므로,
+    서버별로 시각적인 구분이 되도록 호스트 실측값에 고유 편차를 더한다.
     """
-    return psutil.cpu_percent(interval=None)
+    base = psutil.cpu_percent(interval=None)
+    variance = _rng.uniform(-3.0, 3.0)
+    return max(0.0, min(100.0, round(base + variance, 1)))
