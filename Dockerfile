@@ -4,7 +4,7 @@ FROM python:3.12-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends stress-ng curl ca-certificates \
-    && curl -fsSL -o /usr/local/bin/hey https://github.com/rakyll/hey/releases/download/v0.1.4/hey_linux_amd64 \
+    && curl -fsSL -o /usr/local/bin/hey https://storage.googleapis.com/hey-releases/hey_linux_amd64 \
     && chmod +x /usr/local/bin/hey \
     && rm -rf /var/lib/apt/lists/*
 

@@ -7,6 +7,7 @@
 
 import random
 
+from agent import overrides
 from agent.config import GPU_SIMULATE, SERVER_ID
 
 # 서버마다 다른 곡선을 그리도록 SERVER_ID로 시드한 난수원. 직전 값 주변에서
@@ -18,6 +19,8 @@ _value = _rng.uniform(20.0, 80.0)
 def read_gpu_usage() -> float | None:
     """GPU 사용률(%)을 반환한다. GPU_SIMULATE가 꺼져 있으면 None."""
     global _value
+    if overrides.gpu is not None:
+        return overrides.gpu
     if not GPU_SIMULATE:
         return None
     _value = max(0.0, min(100.0, _value + _rng.uniform(-5.0, 5.0)))
