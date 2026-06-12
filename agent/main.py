@@ -6,10 +6,13 @@
 """
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
+from agent import overrides
 from agent.collectors.cpu import read_cpu_usage
 from agent.collectors.gpu import read_gpu_usage
 from agent.collectors.memory import read_mem_usage
@@ -24,9 +27,16 @@ app = FastAPI(title=f"server-pool agent #{SERVER_ID}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+class InjectPayload(BaseModel):
+    cpu: Optional[float] = None
+    mem: Optional[float] = None
+    gpu: Optional[float] = None
+    net: Optional[float] = None
 
 
 @app.get("/health")
@@ -51,3 +61,38 @@ def metrics() -> dict:
         "netUsage": read_net_usage(),
         "status": "OK",
     }
+
+
+@app.post("/inject")
+def inject(payload: InjectPayload) -> dict:
+    """테스트용 메트릭 오버라이드 주입.
+
+    지정한 필드만 오버라이드된다(None이면 해당 필드는 실측 유지).
+    값 범위: 0.0 ~ 100.0.
+    """
+    if payload.cpu is not None:
+        overrides.cpu = max(0.0, min(100.0, payload.cpu))
+    if payload.mem is not None:
+        overrides.mem = max(0.0, min(100.0, payload.mem))
+    if payload.gpu is not None:
+        overrides.gpu = max(0.0, min(100.0, payload.gpu))
+    if payload.net is not None:
+        overrides.net = max(0.0, min(100.0, payload.net))
+    return {
+        "injected": {
+            "cpu": overrides.cpu,
+            "mem": overrides.mem,
+            "gpu": overrides.gpu,
+            "net": overrides.net,
+        }
+    }
+
+
+@app.post("/reset")
+def reset() -> dict:
+    """테스트용 오버라이드 전체 해제. 실측값으로 복귀."""
+    overrides.cpu = None
+    overrides.mem = None
+    overrides.gpu = None
+    overrides.net = None
+    return {"status": "reset"}

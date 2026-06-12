@@ -10,6 +10,7 @@ import time
 
 import psutil
 
+from agent import overrides
 from agent.config import NET_CAP_MBPS
 
 # (monotonic 시각, 누적 송수신 바이트). 첫 호출 전에는 None.
@@ -19,9 +20,12 @@ _last_sample: tuple[float, int] | None = None
 def read_net_usage() -> float:
     """NIC 대역폭 대비 네트워크 사용률(%)을 반환한다.
 
+    오버라이드가 주입되어 있으면 해당 값을 그대로 반환한다.
     첫 호출은 기준점만 잡고 0.0을 반환한다.
     """
     global _last_sample
+    if overrides.net is not None:
+        return overrides.net
     counters = psutil.net_io_counters()
     total_bytes = counters.bytes_sent + counters.bytes_recv
     now = time.monotonic()

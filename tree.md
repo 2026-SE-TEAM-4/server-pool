@@ -11,10 +11,17 @@ N대의 관리 대상 서버를 흉내낸다. 각 컨테이너는 `:9101/metrics
 ```text
 server-pool/
 ├── agent/                     # 에이전트 패키지 (모든 코드는 이 안)
-│   ├── main.py                # FastAPI entrypoint (/metrics, /health)
+│   ├── main.py                # FastAPI entrypoint (/metrics, /health, /inject, /reset)
 │   ├── config.py              # 환경 설정 (SERVER_ID, PORT, NET_CAP_MBPS, GPU_SIMULATE)
+│   ├── overrides.py           # 테스트용 메트릭 오버라이드 상태 (inject/reset 사용)
 │   └── collectors/            # 메트릭 수집기 (1 자원 = 1 파일)
 │                              # cpu.py, memory.py, net.py, gpu.py
+├── scripts/                   # 테스트·운영 보조 스크립트
+│   ├── ctl.py                 # Python CLI (status/up/crash/restart/load/reset)
+│   ├── status.sh              # 셸 버전: 구동 서버 목록 및 헬스/메트릭 확인
+│   ├── crash.sh               # 셸 버전: 서버 강제 종료 (docker kill)
+│   ├── inject_load.sh         # 셸 버전: 메트릭 오버라이드 주입
+│   └── reset_load.sh          # 셸 버전: 오버라이드 해제, 실측 복귀
 ├── tests/                     # 수집기 단위 테스트 (test_collectors.py)
 ├── pyproject.toml             # uv 기반 의존성·도구 설정
 ├── Dockerfile                 # 에이전트 단일 이미지

@@ -14,9 +14,9 @@ N개로 시뮬레이션한다. 각 컨테이너는 `:91xx`의 `/metrics`·`/heal
 
 ## 구성
 
-- 기본 3대: `agent-1`·`agent-2`·`agent-3`, 호스트 포트 9101·9102·9103.
+- 기본 5대: `agent-1`~`agent-5`, 호스트 포트 9101~9105.
 - 각 인스턴스는 `SERVER_ID`·`PORT`를 compose에서 주입받는다.
-- 백엔드 컨테이너는 `host.docker.internal:9101..9103`으로 수집한다.
+- 백엔드 컨테이너는 `host.docker.internal:9101..9105`으로 수집한다.
 
 ## 실행
 
@@ -26,7 +26,43 @@ curl localhost:9101/health     # {"status":"ok"}
 curl localhost:9101/metrics    # 사용률 JSON (serverId, collectedAt, cpu/mem/gpu/netUsage, status)
 ```
 
-대수를 늘리려면 compose에 `agent-4` … 를 같은 형식(고정 포트 publish)으로 추가한다.
+## 제어 CLI
+
+서버 상태 확인, 강제 종료, 부하 주입을 대화형 메뉴로 조작한다.
+
+```bash
+uv run python scripts/ctl.py
+```
+
+실행하면 arrow key로 탐색하는 메뉴가 열린다.
+
+```
+서버풀 제어 CLI
+
+ ID │ Port │ 상태 │  CPU   │  MEM   │  GPU   │  NET
+────┼──────┼──────┼────────┼────────┼────────┼──────
+  1 │ 9101 │  UP  │  12.3% │  65.0% │  34.2% │  0.0%
+  2 │ 9102 │  UP  │  11.0% │  67.1% │  81.8% │  0.0%
+  ...
+
+메뉴를 선택하세요
+❯ 상태 새로고침
+  서버 제어  (기동 / 재시작 / 강제종료)
+  부하 주입  (CPU / MEM / GPU / NET 오버라이드)
+  오버라이드 해제
+  종료
+```
+
+| 메뉴 | 동작 |
+|------|------|
+| 상태 새로고침 | 현재 메트릭 테이블 다시 출력 |
+| 서버 제어 | 기동 / 재시작 / 강제 종료(SIGKILL) — 서버 단위 선택 |
+| 부하 주입 | 프리셋(full / cpu-spike / mem-spike 등) 또는 커스텀 수치로 메트릭 오버라이드 |
+| 오버라이드 해제 | 주입된 값 제거, 실측값 복귀 |
+
+- 부하 주입은 실제 호스트에 부하를 걸지 않고 `/inject` 엔드포인트로 수치만 바꾼다.
+- `Ctrl+C` 또는 종료 메뉴로 빠져나온다.
+- `questionary`·`rich` 가 필요하다(`uv sync --dev` 로 설치됨).
 
 ## 환경 변수
 
@@ -54,17 +90,23 @@ curl localhost:9101/metrics    # 사용률 JSON (serverId, collectedAt, cpu/mem/
 uv run pytest          # 수집기 범위·타입 검증 (tests/test_collectors.py)
 ```
 
-## 장애·부하 시연 (이미지에 stress-ng·hey 포함)
+## 장애·부하 시연
 
-에이전트에는 별도 컨트롤 엔드포인트를 두지 않는다. 모든 시나리오는 외부 docker 명령으로 일으킨다.
-부하를 주면 `/metrics`의 cpu/mem/net 실측값이 반응한다.
+CLI(`scripts/ctl.py`)에서 대화형으로 조작하는 것을 권장한다.
+직접 HTTP로 제어할 경우 아래 엔드포인트를 사용한다.
 
 ```bash
-docker compose exec agent-3 stress-ng --cpu 4 --timeout 60s              # CPU 부하
-docker compose exec agent-3 stress-ng --vm 2 --vm-bytes 1G --timeout 60s # 메모리
-docker pause agent-3   # 메트릭 송신 중단 (docker unpause 로 복구)
-docker stop agent-3    # 서버 다운 (docker start 로 복구)
-hey -z 30s -c 100 http://localhost:9101/metrics                          # 트래픽 폭증
+# 메트릭 오버라이드 주입 (실제 부하 없이 수치만 변경)
+curl -X POST localhost:9101/inject \
+     -H "Content-Type: application/json" \
+     -d '{"cpu": 100, "mem": 85, "gpu": 90, "net": 70}'
+
+# 오버라이드 해제, 실측 복귀
+curl -X POST localhost:9101/reset
+
+# 서버 강제 종료 후 복구
+docker kill server-pool-agent-3-1
+docker compose up -d agent-3
 ```
 
 ## 후속(미구현)
