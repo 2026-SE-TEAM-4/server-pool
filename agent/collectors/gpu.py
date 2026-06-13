@@ -1,50 +1,38 @@
 """GPU 사용률 수집기.
 
-시뮬레이션 환경(에이전트 컨테이너)에는 물리 GPU가 없다. GPU_SIMULATE가
-켜져 있으면 서버별로 다른 합성 사용률을 만들어 대시보드 시연이 의미 있게 하고,
-꺼져 있으면 None(GPU 미탑재)을 반환한다. 실제 GPU 노드 연동은 후속 과제다.
-
-GPU_SIMULATE는 config.py에서 서버 스펙의 gpu_model 유무에 따라 자동 결정된다.
-GPU가 없는 서버(cpu-xeon-01, cpu-epyc-01)는 항상 None을 반환한다.
-
-테스트 툴은 합성값을 외부에서 덮을 수 있어야 한다(에이전트 프로세스 내부 값이라
-docker exec로 직접 못 바꾼다). GPU_OVERRIDE_PATH 파일이 있으면 그 값을 읽어
-반환한다. 파일이 없으면(평상시) 완전히 inert하므로 운영에 영향이 없다. 왜 파일인가:
-FastAPI 제어 라우터를 추가하지 않고 가장 가벼운 IPC로 끝내기 위해서다.
+컨테이너에는 물리 GPU가 없다. GPU_SIMULATE가 켜진 서버만 합성값을 내고, 꺼진 서버는
+항상 None(GPU 미탑재). real 모드는 실제 텔레메트리가 없어 None을 반환한다(실 GPU 노드
+연동은 후속 과제). override 파일이 있으면 모든 모드에서 그 값을 우선한다(테스트 툴 주입용).
 """
 
-import hashlib
-import random
-
+from agent import sim
 from agent.config import GPU_SIMULATE, SERVER_ID
 
-# 테스트 툴이 docker exec로 기록하는 오버라이드 파일 경로.
 GPU_OVERRIDE_PATH = "/tmp/agent_gpu_override"
+GPU_BASELINE_PATH = "/tmp/agent_gpu_baseline"
 
-# 네임스페이스 해시로 시드를 만들어 서버 ID가 커질수록 수치도 커지는 단조성을 깬다.
-_rng = random.Random(int(hashlib.sha256(f"gpu:{SERVER_ID}".encode()).hexdigest(), 16))
-_value = _rng.uniform(20.0, 80.0)
+_LOW, _HIGH = 0.0, 100.0
+_SEED_BASELINE = sim.seeded_rng(f"gpu:{SERVER_ID}").uniform(20.0, 80.0)
+_stable = sim.MeanRevertSim(f"gpu:{SERVER_ID}", _SEED_BASELINE, _LOW, _HIGH)
 
-
-def _read_override() -> float | None:
-    """오버라이드 파일 값을 읽는다. 없거나 0~100 밖이면 None."""
-    try:
-        with open(GPU_OVERRIDE_PATH) as f:
-            value = float(f.read().strip())
-    except (OSError, ValueError):
-        return None
-    if 0.0 <= value <= 100.0:
-        return round(value, 1)
-    return None
+# randomwalk 모드용 상태(기존 ±5% 동작 보존).
+_walk_rng = sim.seeded_rng(f"gpu:{SERVER_ID}")
+_walk = _walk_rng.uniform(20.0, 80.0)
 
 
 def read_gpu_usage() -> float | None:
-    """GPU 사용률(%)을 반환한다. GPU_SIMULATE가 꺼져 있으면 None."""
-    global _value
+    """GPU 사용률(%). GPU 미탑재/real 모드는 None."""
+    global _walk
     if not GPU_SIMULATE:
         return None
-    override = _read_override()
+    override = sim.read_pct_file(GPU_OVERRIDE_PATH)
     if override is not None:
         return override
-    _value = max(0.0, min(100.0, _value + _rng.uniform(-5.0, 5.0)))
-    return round(_value, 1)
+    mode = sim.current_mode()
+    if mode == "real":
+        return None
+    if mode == "randomwalk":
+        _walk = max(_LOW, min(_HIGH, _walk + _walk_rng.uniform(-5.0, 5.0)))
+        return round(_walk, 1)
+    baseline = sim.read_pct_file(GPU_BASELINE_PATH)
+    return _stable.step(baseline if baseline is not None else _SEED_BASELINE)

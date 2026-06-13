@@ -9,6 +9,8 @@ from app.ui.main_window import MainWindow
 
 def main():
     app = QApplication(sys.argv)
+    from app.ui.theme import STYLESHEET
+    app.setStyleSheet(STYLESHEET)
     try:
         window = MainWindow()
     except Exception as exc:  # docker.from_env 실패 등

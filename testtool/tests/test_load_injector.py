@@ -1,7 +1,12 @@
 from unittest.mock import MagicMock
 
-from app import config
+from app import config, load_injector
 from app import load_injector as li
+
+
+def test_build_set_cmd_for_net():
+    cmd = load_injector.build_set_cmd(config.NET_OVERRIDE_PATH, 70)
+    assert cmd == ["sh", "-c", f"echo 70 > {config.NET_OVERRIDE_PATH}"]
 
 
 def test_set_cmd_writes_value_to_path():
@@ -34,7 +39,7 @@ def test_apply_methods_target_correct_override_paths():
     assert any(config.GPU_OVERRIDE_PATH in j for j in joined)
 
 
-def test_revert_all_clears_three_paths():
+def test_revert_all_clears_all_override_paths():
     docker = MagicMock()
     inj = li.LoadInjector(docker)
     inj.revert_all(1)
@@ -42,3 +47,4 @@ def test_revert_all_clears_three_paths():
     assert any(config.CPU_OVERRIDE_PATH in c and "rm" in c for c in cmds)
     assert any(config.MEM_OVERRIDE_PATH in c and "rm" in c for c in cmds)
     assert any(config.GPU_OVERRIDE_PATH in c and "rm" in c for c in cmds)
+    assert any(config.NET_OVERRIDE_PATH in c and "rm" in c for c in cmds)

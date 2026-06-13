@@ -1,7 +1,10 @@
 """서버 리스트 테이블. 폴러 스냅샷으로 갱신, 선택 시 server_id 시그널."""
 
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QAbstractItemView
+
+from app.ui import theme
 
 _COLS = ["ID", "상태", "CPU", "RAM", "GPU", "Net"]
 
@@ -36,6 +39,8 @@ class ServerTable(QTableWidget):
             if snap is None:
                 continue
             m = snap.metrics
-            values = [snap.status, _fmt(m.cpu), _fmt(m.mem), _fmt(m.gpu), _fmt(m.net)]
-            for col, text in enumerate(values, start=1):
-                self.setItem(row, col, QTableWidgetItem(text))
+            self.setItem(row, 1, QTableWidgetItem(snap.status))
+            for col, value in enumerate([m.cpu, m.mem, m.gpu, m.net], start=2):
+                item = QTableWidgetItem(_fmt(value))
+                item.setForeground(QColor(theme.level_color(value)))
+                self.setItem(row, col, item)

@@ -105,7 +105,7 @@ NET_CAP_MBPS = float(os.getenv("NET_CAP_MBPS", str(SPEC.get("net_cap_mbps", 1000
 _gpu_simulate_default = "true" if SPEC.get("gpu_model") else "false"
 GPU_SIMULATE = os.getenv("GPU_SIMULATE", _gpu_simulate_default).lower() == "true"
 
-# CPU·메모리 시뮬레이션: 컨테이너는 호스트 /proc를 공유하므로 psutil 실측값이
-# 모든 에이전트에서 동일하게 나온다. 기본 활성화해 서버마다 다른 곡선을 유지한다.
-# 실제 베어메탈 배포 시 METRIC_SIMULATE=false로 끄면 psutil 실측값으로 전환된다.
-METRIC_SIMULATE = os.getenv("METRIC_SIMULATE", "true").lower() == "true"
+# 기본 모드: 모드 파일(/tmp/agent_mode)이 없을 때 적용한다.
+# stable=안정 합성(데모 기본), real=psutil 실측, randomwalk=±8% 랜덤워크.
+# 베어메탈 실측 배포는 DEFAULT_MODE=real.
+DEFAULT_MODE = os.getenv("DEFAULT_MODE", "stable")
