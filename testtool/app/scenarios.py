@@ -110,6 +110,95 @@ class RandomSpike:
         return elapsed_s >= self._duration and not self._revert_at
 
 
+class MemoryLeak:
+    """대상 1대의 RAM을 start_pct→max_pct로 duration 동안 선형 상승.
+    임계 도달 시 stop(OOM 모사)→oom_hold초 뒤 start·revert.
+    """
+
+    def __init__(self, server_ids, duration_s, start_pct=40, max_pct=99, oom_hold_s=8):
+        self._ids = list(server_ids)
+        self._duration = max(1, duration_s)
+        self._start = start_pct
+        self._max = max_pct
+        self._oom_hold = oom_hold_s
+        self._target = None
+        self._restart_at = None
+        self._oom = False
+        self._done = False
+
+    def tick(self, elapsed_s, running, rng):
+        actions = []
+        if self._target is None:
+            candidates = [s for s in self._ids if s in running]
+            if not candidates:
+                return []
+            self._target = rng.choice(candidates)
+        if self._restart_at is not None:
+            if elapsed_s >= self._restart_at:
+                self._restart_at = None
+                self._done = True
+                return [Action("start", self._target), Action("revert", self._target)]
+            return []
+        if self._oom:
+            return []
+        ramp = min(1.0, elapsed_s / self._duration)
+        pct = int(self._start + (self._max - self._start) * ramp)
+        actions.append(Action("load_ram", self._target, pct))
+        if pct >= self._max:
+            self._oom = True
+            self._restart_at = elapsed_s + self._oom_hold
+            actions.append(Action("stop", self._target, self._oom_hold))
+        return actions
+
+    def is_done(self, elapsed_s):
+        return self._done
+
+
+class CascadingFailure:
+    """1대 정지로 시작, 남은 서버 CPU/RAM을 step_every_s마다 단계적으로 상승(부하 재분배).
+    duration 만료 시 전체 revert·정지 서버 start.
+    """
+
+    def __init__(self, server_ids, duration_s, step_every_s=8,
+                 base_pct=55, step_pct=12, max_pct=98):
+        self._ids = list(server_ids)
+        self._duration = duration_s
+        self._every = max(1, step_every_s)
+        self._base = base_pct
+        self._step = step_pct
+        self._max = max_pct
+        self._downed = None
+        self._reverted = False
+
+    def tick(self, elapsed_s, running, rng):
+        if elapsed_s >= self._duration:
+            if self._reverted:
+                return []
+            self._reverted = True
+            acts = [Action("revert", s) for s in self._ids]
+            if self._downed is not None:
+                acts.append(Action("start", self._downed))
+            return acts
+        if self._downed is None:
+            candidates = [s for s in self._ids if s in running]
+            if not candidates:
+                return []
+            self._downed = rng.choice(candidates)
+            return [Action("stop", self._downed)]
+        actions = []
+        if elapsed_s > 0 and elapsed_s % self._every == 0:
+            stage = elapsed_s // self._every
+            pct = min(self._max, self._base + self._step * (stage - 1))
+            for s in self._ids:
+                if s != self._downed and s in running:
+                    actions.append(Action("load_cpu", s, pct))
+                    actions.append(Action("load_ram", s, pct))
+        return actions
+
+    def is_done(self, elapsed_s):
+        return elapsed_s >= self._duration and self._reverted
+
+
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, QTimer, pyqtSignal  # noqa: E402
 
 
@@ -184,6 +273,10 @@ class ChaosRunner(QObject):
             pct = int(a.value)
             self._run_async(lambda s=sid, v=pct: self._injector.set_gpu(s, v))
             self.log.emit(f"agent-{sid} GPU {pct}% 설정")
+        elif a.kind == "load_net":
+            pct = int(a.value)
+            self._run_async(lambda s=sid, v=pct: self._injector.apply_net(s, v))
+            self.log.emit(f"agent-{sid} NET {pct}% 부하 주입")
         elif a.kind == "revert":
             self._run_async(lambda s=sid: self._injector.revert_all(s))
             self.log.emit(f"agent-{sid} 부하 원복")

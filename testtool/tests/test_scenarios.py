@@ -1,6 +1,62 @@
 import random
 
 from app import scenarios as sc
+from app.scenarios import CascadingFailure, MemoryLeak
+
+
+def test_memory_leak_ramps_then_oom():
+    eng = MemoryLeak([1, 2], duration_s=10, start_pct=40, max_pct=99, oom_hold_s=3)
+    rng = random.Random(0)
+    running = {1, 2}
+    # 초반: 대상 선택 + load_ram 상승
+    a0 = eng.tick(0, running, rng)
+    kinds0 = [x.kind for x in a0]
+    assert "load_ram" in kinds0
+    target = a0[0].server_id
+    # 램프 진행 중 값이 단조 증가
+    v1 = next(x.value for x in eng.tick(2, running, rng) if x.kind == "load_ram")
+    v2 = next(x.value for x in eng.tick(6, running, rng) if x.kind == "load_ram")
+    assert v2 > v1
+    # 임계 도달 시 stop 발생
+    acts = eng.tick(10, running, rng)
+    assert any(x.kind == "stop" and x.server_id == target for x in acts)
+
+
+def test_memory_leak_done_after_restart():
+    eng = MemoryLeak([1], duration_s=4, start_pct=40, max_pct=99, oom_hold_s=2)
+    rng = random.Random(0)
+    running = {1}
+    for t in range(0, 5):
+        eng.tick(t, running, rng)
+    # oom_hold 경과 후 start+revert, done
+    later = eng.tick(20, running, rng)
+    assert any(x.kind == "start" for x in later)
+    assert eng.is_done(20)
+
+
+def test_cascading_starts_with_a_stop():
+    eng = CascadingFailure([1, 2, 3], duration_s=30, step_every_s=5)
+    rng = random.Random(1)
+    acts = eng.tick(0, {1, 2, 3}, rng)
+    assert len(acts) == 1 and acts[0].kind == "stop"
+
+
+def test_cascading_loads_remaining_servers():
+    eng = CascadingFailure([1, 2, 3], duration_s=30, step_every_s=5)
+    rng = random.Random(1)
+    eng.tick(0, {1, 2, 3}, rng)          # 한 대 정지
+    acts = eng.tick(5, {1, 2, 3}, rng)   # 나머지 부하
+    loaded = {x.server_id for x in acts if x.kind in ("load_cpu", "load_ram")}
+    assert len(loaded) >= 1
+
+
+def test_cascading_reverts_after_duration():
+    eng = CascadingFailure([1, 2], duration_s=10, step_every_s=5)
+    rng = random.Random(1)
+    eng.tick(0, {1, 2}, rng)
+    acts = eng.tick(10, {1, 2}, rng)
+    assert any(x.kind == "revert" for x in acts)
+    assert eng.is_done(10)
 
 
 def test_overload_all_loads_every_running_server_then_reverts():
