@@ -32,3 +32,31 @@ def test_net_usage_in_range() -> None:
 def test_gpu_usage_in_range_or_none() -> None:
     value = read_gpu_usage()
     assert value is None or (0.0 <= value <= 100.0)
+
+
+import agent.collectors.gpu as gpu_mod
+
+
+def test_gpu_override_returns_file_value(tmp_path, monkeypatch) -> None:
+    override = tmp_path / "gpu_override"
+    override.write_text("73.5")
+    monkeypatch.setattr(gpu_mod, "GPU_OVERRIDE_PATH", str(override))
+    monkeypatch.setattr(gpu_mod, "GPU_SIMULATE", True)
+    assert gpu_mod.read_gpu_usage() == 73.5
+
+
+def test_gpu_override_ignored_when_out_of_range(tmp_path, monkeypatch) -> None:
+    override = tmp_path / "gpu_override"
+    override.write_text("250")
+    monkeypatch.setattr(gpu_mod, "GPU_OVERRIDE_PATH", str(override))
+    monkeypatch.setattr(gpu_mod, "GPU_SIMULATE", True)
+    value = gpu_mod.read_gpu_usage()
+    assert 0.0 <= value <= 100.0  # 범위 밖 오버라이드는 무시, 합성값 사용
+
+
+def test_gpu_override_ignored_when_not_simulated(tmp_path, monkeypatch) -> None:
+    override = tmp_path / "gpu_override"
+    override.write_text("50")
+    monkeypatch.setattr(gpu_mod, "GPU_OVERRIDE_PATH", str(override))
+    monkeypatch.setattr(gpu_mod, "GPU_SIMULATE", False)
+    assert gpu_mod.read_gpu_usage() is None  # GPU 미탑재 서버는 항상 None
