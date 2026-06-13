@@ -18,7 +18,7 @@ _walk = _walk_rng.uniform(5.0, 70.0)
 
 
 def read_cpu_usage() -> float:
-    """현재 CPU 사용률(%). 우선순위: override > stable > real > randomwalk."""
+    """현재 CPU 사용률(%). override가 모든 모드에서 우선. 모드로 real·randomwalk·stable(기본) 중 하나를 디스패치."""
     global _walk
     override = sim.read_pct_file(CPU_OVERRIDE_PATH)
     if override is not None:

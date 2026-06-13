@@ -18,7 +18,7 @@ _walk = _walk_rng.uniform(20.0, 75.0)
 
 
 def read_mem_usage() -> float:
-    """현재 메모리 사용률(%). 우선순위: override > stable > real > randomwalk."""
+    """현재 메모리 사용률(%). override가 모든 모드에서 우선. 모드로 real·randomwalk·stable(기본) 중 하나를 디스패치."""
     global _walk
     override = sim.read_pct_file(MEM_OVERRIDE_PATH)
     if override is not None:

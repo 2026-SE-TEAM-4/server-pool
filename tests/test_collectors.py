@@ -4,6 +4,11 @@
 실제 수치는 환경마다 다르므로 범위·타입만 검증한다.
 """
 
+import agent.collectors.cpu as cpu_mod
+import agent.collectors.gpu as gpu_mod
+import agent.collectors.memory as mem_mod
+import agent.collectors.net as net_mod
+from agent import sim as sim_mod
 from agent.collectors.cpu import read_cpu_usage
 from agent.collectors.gpu import read_gpu_usage
 from agent.collectors.memory import read_mem_usage
@@ -36,11 +41,6 @@ def test_net_usage_in_range(monkeypatch) -> None:
 def test_gpu_usage_in_range_or_none() -> None:
     value = read_gpu_usage()
     assert value is None or (0.0 <= value <= 100.0)
-
-
-import agent.collectors.cpu as cpu_mod
-import agent.collectors.gpu as gpu_mod
-import agent.collectors.memory as mem_mod
 
 
 def test_gpu_override_returns_file_value(tmp_path, monkeypatch) -> None:
@@ -96,9 +96,6 @@ def test_mem_override_ignored_when_out_of_range(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(mem_mod, "MEM_OVERRIDE_PATH", str(override))
     value = mem_mod.read_mem_usage()
     assert 0.0 <= value <= 100.0
-
-
-from agent import sim as sim_mod
 
 
 def test_cpu_override_wins_in_every_mode(tmp_path, monkeypatch):
@@ -164,9 +161,6 @@ def test_gpu_stable_in_range(tmp_path, monkeypatch):
     monkeypatch.setattr(sim_mod, "DEFAULT_MODE", "stable")
     values = [gpu_mod.read_gpu_usage() for _ in range(120)]
     assert all(v is not None and 0.0 <= v <= 100.0 for v in values)
-
-
-import agent.collectors.net as net_mod
 
 
 def test_net_override_wins(tmp_path, monkeypatch):
