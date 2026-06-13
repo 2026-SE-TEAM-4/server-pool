@@ -34,7 +34,9 @@ def test_gpu_usage_in_range_or_none() -> None:
     assert value is None or (0.0 <= value <= 100.0)
 
 
+import agent.collectors.cpu as cpu_mod
 import agent.collectors.gpu as gpu_mod
+import agent.collectors.memory as mem_mod
 
 
 def test_gpu_override_returns_file_value(tmp_path, monkeypatch) -> None:
@@ -60,3 +62,33 @@ def test_gpu_override_ignored_when_not_simulated(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(gpu_mod, "GPU_OVERRIDE_PATH", str(override))
     monkeypatch.setattr(gpu_mod, "GPU_SIMULATE", False)
     assert gpu_mod.read_gpu_usage() is None  # GPU 미탑재 서버는 항상 None
+
+
+def test_cpu_override_returns_file_value(tmp_path, monkeypatch) -> None:
+    override = tmp_path / "cpu_override"
+    override.write_text("55.0")
+    monkeypatch.setattr(cpu_mod, "CPU_OVERRIDE_PATH", str(override))
+    assert cpu_mod.read_cpu_usage() == 55.0
+
+
+def test_cpu_override_ignored_when_out_of_range(tmp_path, monkeypatch) -> None:
+    override = tmp_path / "cpu_override"
+    override.write_text("250")
+    monkeypatch.setattr(cpu_mod, "CPU_OVERRIDE_PATH", str(override))
+    value = cpu_mod.read_cpu_usage()
+    assert 0.0 <= value <= 100.0
+
+
+def test_mem_override_returns_file_value(tmp_path, monkeypatch) -> None:
+    override = tmp_path / "mem_override"
+    override.write_text("42.0")
+    monkeypatch.setattr(mem_mod, "MEM_OVERRIDE_PATH", str(override))
+    assert mem_mod.read_mem_usage() == 42.0
+
+
+def test_mem_override_ignored_when_out_of_range(tmp_path, monkeypatch) -> None:
+    override = tmp_path / "mem_override"
+    override.write_text("-10")
+    monkeypatch.setattr(mem_mod, "MEM_OVERRIDE_PATH", str(override))
+    value = mem_mod.read_mem_usage()
+    assert 0.0 <= value <= 100.0
