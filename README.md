@@ -4,9 +4,10 @@
 백엔드(APScheduler)가 메트릭을 수집할 대상 서버들을 동일한 경량 에이전트 이미지
 N개로 시뮬레이션한다. 각 컨테이너는 `:91xx`의 `/metrics`·`/health`를 노출한다.
 
-> **현재 상태.** 부팅·`/health`·`/metrics`(실측)까지 동작한다. `/metrics`는 psutil로
-> CPU·메모리·네트워크를 실측하고, GPU는 시뮬레이션 환경에 물리 GPU가 없어 합성값
-> (`GPU_SIMULATE`)을 낸다. 필드·단위 계약의 단일 출처는
+> **현재 상태.** 부팅·`/health`·`/metrics`까지 동작한다. `/metrics`는 컨테이너 모드에 따라
+> 안정 합성(stable)·psutil 실측(real)·랜덤워크(randomwalk) 중 하나로 값을 낸다(기본 stable).
+> GPU는 시뮬레이션 환경에 물리 GPU가 없어 합성값(`GPU_SIMULATE`)을 내며 real 모드에서는
+> `null`이다. 모드 모델은 아래 "메트릭 모드" 절을 참고한다. 필드·단위 계약의 단일 출처는
 > `diagram-and-docs/serverpool-spec.html`(서버 풀 명세서)이다.
 
 ## 구성
@@ -33,6 +34,34 @@ curl localhost:9101/metrics    # 사용률 JSON (serverId, collectedAt, cpu/mem/
 | SERVER_ID | 1 | 에이전트 식별(인스턴스별 주입) |
 | NET_CAP_MBPS | 1000 | 네트워크 사용률 계산 기준 대역폭(Mbps) |
 | GPU_SIMULATE | true | 물리 GPU가 없을 때 합성 GPU 사용률 노출 여부 |
+| DEFAULT_MODE | stable | 모드 파일이 없을 때 적용할 기본 모드(stable/real/randomwalk) |
+
+## 메트릭 모드
+
+각 컨테이너는 모드 파일(`/tmp/agent_mode`) 한 줄로 메트릭 산출 방식을 정한다.
+파일이 없거나 알 수 없는 값이면 `DEFAULT_MODE`(기본 `stable`)를 쓴다.
+컨테이너를 재시작하면 `/tmp` 파일이 사라져 다시 기본 모드로 돌아간다.
+
+| 모드 | 동작 |
+| --- | --- |
+| stable | 자원별 기준선 중심으로 0.5~2%씩 평균회귀하는 안정 합성값(데모 기본) |
+| real | psutil 실측(CPU/RAM/Net). GPU는 텔레메트리가 없어 `null` |
+| randomwalk | 기준값에서 ±N%씩 흔들리는 랜덤워크 합성값 |
+
+값 우선순위는 **override 파일 > stable > real > randomwalk**다.
+즉 오버라이드 파일(`/tmp/agent_{cpu,mem,gpu,net}_override`)이 있으면 모드와 무관하게 그 값을 낸다.
+
+```bash
+# 한 컨테이너를 실측 모드로 전환
+docker compose exec agent-3 sh -c 'echo real > /tmp/agent_mode'
+# 다시 기본(stable)으로
+docker compose exec agent-3 rm -f /tmp/agent_mode
+# CPU 기준선 80%로 지정(stable 모드 중심값)
+docker compose exec agent-3 sh -c 'echo 80 > /tmp/agent_cpu_baseline'
+```
+
+stable 모드의 기준선은 자원별 파일(`/tmp/agent_{cpu,mem,gpu,net}_baseline`)로 지정한다.
+지정하지 않으면 `SERVER_ID`에서 파생한 시드 기준선을 쓴다.
 
 ## /metrics 응답 (계약 요약)
 
