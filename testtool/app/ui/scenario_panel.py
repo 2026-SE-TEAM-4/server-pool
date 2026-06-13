@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QPushButton, QSpinBox, QVBoxLayout,
 )
 
-SCENARIOS = ["전체 과부하", "랜덤 정지", "랜덤 부하 스파이크"]
+SCENARIOS = ["전체 과부하", "랜덤 정지", "랜덤 부하 스파이크", "메모리 누수", "연쇄 장애"]
 
 
 class ScenarioPanel(QGroupBox):

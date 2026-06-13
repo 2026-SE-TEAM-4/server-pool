@@ -9,10 +9,12 @@ from app import config, scenarios
 from app.docker_control import DockerControl
 from app.load_injector import LoadInjector
 from app.poller import Poller
+from app.sim_control import SimControl
 from app.ui.log_panel import LogPanel
 from app.ui.scenario_panel import ScenarioPanel
 from app.ui.server_panel import ServerPanel
 from app.ui.server_table import ServerTable
+from app.ui.sim_panel import SimPanel
 
 
 class _Task(QRunnable):
@@ -38,11 +40,13 @@ class MainWindow(QWidget):
         self._pool = QThreadPool.globalInstance()
         self._docker = DockerControl()
         self._injector = LoadInjector(self._docker)
+        self._sim = SimControl(self._docker)
         self._runner = None
         self._last_running: set[int] = set()
 
         self._table = ServerTable(config.SERVER_IDS)
         self._panel = ServerPanel()
+        self._sim_panel = SimPanel()
         self._scenario = ScenarioPanel()
         self._log = LogPanel()
         self._poller = Poller(self._docker)
@@ -50,6 +54,7 @@ class MainWindow(QWidget):
         left = QVBoxLayout()
         left.addWidget(self._table)
         left.addWidget(self._panel)
+        left.addWidget(self._sim_panel)
         right = QVBoxLayout()
         right.addWidget(self._scenario)
         right.addWidget(self._log)
@@ -58,6 +63,9 @@ class MainWindow(QWidget):
         root.addLayout(right, 1)
 
         self._table.serverSelected.connect(self._panel.set_server)
+        self._table.serverSelected.connect(self._sim_panel.set_server)
+        self._sim_panel.modeRequested.connect(self._on_mode)
+        self._sim_panel.baselineRequested.connect(self._on_baseline)
         self._panel.metricRequested.connect(self._on_metric)
         self._panel.lifecycleRequested.connect(self._on_lifecycle)
         self._scenario.startRequested.connect(self._on_scenario_start)
@@ -92,6 +100,18 @@ class MainWindow(QWidget):
         self._run_async(fn)
         self._log.append(f"agent-{server_id} {'정지' if action == 'stop' else '재시작'}")
 
+    def _on_mode(self, server_id, mode):
+        self._run_async(lambda: self._sim.set_mode(server_id, mode))
+        self._log.append(f"agent-{server_id} 모드 → {mode}")
+
+    def _on_baseline(self, server_id, resource, value):
+        if value is None:
+            self._run_async(lambda: self._sim.clear_baseline(server_id, resource))
+            self._log.append(f"agent-{server_id} {resource.upper()} 기준선 해제")
+        else:
+            self._run_async(lambda: self._sim.set_baseline(server_id, resource, value))
+            self._log.append(f"agent-{server_id} {resource.upper()} 기준선 {value}%")
+
     def _on_scenario_start(self, params):
         engine = self._build_engine(params)
         self._runner = scenarios.ChaosRunner(
@@ -114,4 +134,8 @@ class MainWindow(QWidget):
             return scenarios.OverloadAll(ids, p["intensity"], duration_s)
         if p["scenario"] == "랜덤 정지":
             return scenarios.RandomStop(ids, duration_s, p["stop_min"], p["stop_max"], every_s=5)
+        if p["scenario"] == "메모리 누수":
+            return scenarios.MemoryLeak(ids, duration_s)
+        if p["scenario"] == "연쇄 장애":
+            return scenarios.CascadingFailure(ids, duration_s)
         return scenarios.RandomSpike(ids, duration_s, every_s=5)
