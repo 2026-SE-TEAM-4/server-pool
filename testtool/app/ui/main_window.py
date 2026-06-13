@@ -2,7 +2,7 @@
 
 import random
 
-from PyQt6.QtCore import QRunnable, QThreadPool
+from PyQt6.QtCore import QRunnable, QThreadPool, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from app import config, scenarios
@@ -16,18 +16,21 @@ from app.ui.server_table import ServerTable
 
 
 class _Task(QRunnable):
-    def __init__(self, fn):
+    def __init__(self, fn, on_error):
         super().__init__()
         self._fn = fn
+        self._on_error = on_error
 
     def run(self):
         try:
             self._fn()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._on_error(str(exc))
 
 
 class MainWindow(QWidget):
+    actionError = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("server-pool 테스트 콘솔")
@@ -60,10 +63,11 @@ class MainWindow(QWidget):
         self._scenario.startRequested.connect(self._on_scenario_start)
         self._scenario.stopRequested.connect(self._on_scenario_stop)
         self._poller.snapshotReady.connect(self._on_snapshot)
+        self.actionError.connect(self._log.append)
         self._poller.start()
 
     def _run_async(self, fn):
-        self._pool.start(_Task(fn))
+        self._pool.start(_Task(fn, self.actionError.emit))
 
     def _on_snapshot(self, snapshots):
         self._table.update_snapshots(snapshots)

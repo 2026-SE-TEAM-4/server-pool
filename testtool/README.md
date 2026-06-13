@@ -24,8 +24,5 @@
 
 ## 동작 방식
 
-- CPU/RAM: docker exec로 컨테이너 안 파이썬 부하 프로세스 기동(실부하). 중지는 센티넬 pkill.
-- GPU: docker exec로 오버라이드 파일(`/tmp/agent_gpu_override`) 기록. 에이전트 gpu 수집기가 읽는다.
+- CPU/RAM/GPU: docker exec로 컨테이너 안 오버라이드 파일(`/tmp/agent_{cpu,mem,gpu}_override`)에 값을 쓴다. 에이전트 수집기가 이 파일이 있으면 그 값을 우선 반환한다(없으면 시뮬레이션 값). 되돌리기는 파일 삭제.
 - 도커 수명주기: docker SDK.
-
-> 실부하라 CPU/RAM은 정확히 50%/100%가 되지 않는다(의도된 현실성). RAM은 호스트 OOM 방지를 위해 안전 예산(config.RAM_LOAD_MB_PER_100) 내에서만 할당한다.

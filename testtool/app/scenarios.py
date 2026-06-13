@@ -110,7 +110,21 @@ class RandomSpike:
         return elapsed_s >= self._duration and not self._revert_at
 
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal  # noqa: E402
+from PyQt6.QtCore import QObject, QRunnable, QThreadPool, QTimer, pyqtSignal  # noqa: E402
+
+
+class _ChaosJob(QRunnable):
+    """카오스 액션의 블로킹 docker/injector 호출을 UI 스레드 밖에서 실행한다."""
+
+    def __init__(self, fn):
+        super().__init__()
+        self._fn = fn
+
+    def run(self):
+        try:
+            self._fn()
+        except Exception:
+            pass
 
 
 class ChaosRunner(QObject):
@@ -132,12 +146,16 @@ class ChaosRunner(QObject):
         self._elapsed = 0
         self._running: set[int] = set()
         self._touched: set[int] = set()  # 부하/정지를 가한 서버(원복 대상)
+        self._pool = QThreadPool.globalInstance()
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
 
     def set_running(self, running):
         self._running = set(running)
+
+    def _run_async(self, fn):
+        self._pool.start(_ChaosJob(fn))
 
     def start(self):
         self._elapsed = 0
@@ -153,30 +171,35 @@ class ChaosRunner(QObject):
 
     def _dispatch(self, a):
         self._touched.add(a.server_id)
+        sid = a.server_id
         if a.kind == "load_cpu":
-            self._injector.apply_cpu(a.server_id, int(a.value))
-            self.log.emit(f"agent-{a.server_id} CPU {int(a.value)}% 부하 주입")
+            pct = int(a.value)
+            self._run_async(lambda s=sid, v=pct: self._injector.apply_cpu(s, v))
+            self.log.emit(f"agent-{sid} CPU {pct}% 부하 주입")
         elif a.kind == "load_ram":
-            self._injector.apply_ram(a.server_id, int(a.value))
-            self.log.emit(f"agent-{a.server_id} RAM {int(a.value)}% 부하 주입")
+            pct = int(a.value)
+            self._run_async(lambda s=sid, v=pct: self._injector.apply_ram(s, v))
+            self.log.emit(f"agent-{sid} RAM {pct}% 부하 주입")
         elif a.kind == "gpu":
-            self._injector.set_gpu(a.server_id, int(a.value))
-            self.log.emit(f"agent-{a.server_id} GPU {int(a.value)}% 설정")
+            pct = int(a.value)
+            self._run_async(lambda s=sid, v=pct: self._injector.set_gpu(s, v))
+            self.log.emit(f"agent-{sid} GPU {pct}% 설정")
         elif a.kind == "revert":
-            self._injector.revert_all(a.server_id)
-            self.log.emit(f"agent-{a.server_id} 부하 원복")
+            self._run_async(lambda s=sid: self._injector.revert_all(s))
+            self.log.emit(f"agent-{sid} 부하 원복")
         elif a.kind == "stop":
-            self._docker.stop(a.server_id)
-            self.log.emit(f"agent-{a.server_id} 정지 ({int(a.value)}초)")
+            self._run_async(lambda s=sid: self._docker.stop(s))
+            self.log.emit(f"agent-{sid} 정지 ({int(a.value)}초)")
         elif a.kind == "start":
-            self._docker.start(a.server_id)
-            self.log.emit(f"agent-{a.server_id} 재시작")
+            self._run_async(lambda s=sid: self._docker.start(s))
+            self.log.emit(f"agent-{sid} 재시작")
 
     def stop(self):
         self._timer.stop()
         for sid in self._touched:
-            self._injector.revert_all(sid)
-            self._docker.start(sid)  # 정지돼 있었다면 복구(이미 떠 있으면 무해)
+            self._run_async(
+                lambda s=sid: (self._injector.revert_all(s), self._docker.start(s))
+            )
         self.log.emit("카오스 중지 — 전체 원복")
         self._touched.clear()
         self.finished.emit()

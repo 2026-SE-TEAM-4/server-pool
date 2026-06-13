@@ -4,6 +4,8 @@ UI/Qt를 모른다. SERVER_ID로만 다룬다. compose 서비스 라벨(agent-N)
 발견해 매핑한다. 모든 호출은 블로킹이므로 호출 측(poller)이 워커 스레드에서 부른다.
 """
 
+import threading
+
 import docker
 
 from app import config
@@ -14,6 +16,7 @@ class DockerControl:
         # client 주입은 테스트용. 실제 실행은 from_env로 도커 소켓에 붙는다.
         self._client = client or docker.from_env()
         self._by_id: dict[int, object] = {}
+        self._lock = threading.Lock()
 
     def discover(self) -> dict[int, object]:
         """실행/정지 포함 모든 컨테이너에서 agent-N을 찾아 SERVER_ID로 매핑한다."""
@@ -23,11 +26,13 @@ class DockerControl:
             server_id = config.service_to_server_id(service)
             if server_id is not None:
                 found[server_id] = container
-        self._by_id = found
+        with self._lock:
+            self._by_id = found
         return found
 
     def _get(self, server_id: int):
-        return self._by_id.get(server_id)
+        with self._lock:
+            return self._by_id.get(server_id)
 
     def status(self, server_id: int) -> str:
         """컨테이너 상태 문자열. 발견 안 됐으면 'offline'."""
