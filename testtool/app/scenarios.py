@@ -108,3 +108,75 @@ class RandomSpike:
 
     def is_done(self, elapsed_s):
         return elapsed_s >= self._duration and not self._revert_at
+
+
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal  # noqa: E402
+
+
+class ChaosRunner(QObject):
+    """엔진을 매초 구동하고 Action을 docker/injector로 디스패치한다.
+
+    running 집합은 폴러 스냅샷으로 갱신된다(set_running). 중지 시 그동안 부하/정지한
+    모든 서버를 즉시 원복한다.
+    """
+
+    log = pyqtSignal(str)
+    finished = pyqtSignal()
+
+    def __init__(self, engine, docker, injector, rng, parent=None):
+        super().__init__(parent)
+        self._engine = engine
+        self._docker = docker
+        self._injector = injector
+        self._rng = rng
+        self._elapsed = 0
+        self._running: set[int] = set()
+        self._touched: set[int] = set()  # 부하/정지를 가한 서버(원복 대상)
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._tick)
+
+    def set_running(self, running):
+        self._running = set(running)
+
+    def start(self):
+        self._elapsed = 0
+        self._timer.start()
+
+    def _tick(self):
+        actions = self._engine.tick(self._elapsed, self._running, self._rng)
+        for a in actions:
+            self._dispatch(a)
+        self._elapsed += 1
+        if self._engine.is_done(self._elapsed):
+            self.stop()
+
+    def _dispatch(self, a):
+        self._touched.add(a.server_id)
+        if a.kind == "load_cpu":
+            self._injector.apply_cpu(a.server_id, int(a.value))
+            self.log.emit(f"agent-{a.server_id} CPU {int(a.value)}% 부하 주입")
+        elif a.kind == "load_ram":
+            self._injector.apply_ram(a.server_id, int(a.value))
+            self.log.emit(f"agent-{a.server_id} RAM {int(a.value)}% 부하 주입")
+        elif a.kind == "gpu":
+            self._injector.set_gpu(a.server_id, int(a.value))
+            self.log.emit(f"agent-{a.server_id} GPU {int(a.value)}% 설정")
+        elif a.kind == "revert":
+            self._injector.revert_all(a.server_id)
+            self.log.emit(f"agent-{a.server_id} 부하 원복")
+        elif a.kind == "stop":
+            self._docker.stop(a.server_id)
+            self.log.emit(f"agent-{a.server_id} 정지 ({int(a.value)}초)")
+        elif a.kind == "start":
+            self._docker.start(a.server_id)
+            self.log.emit(f"agent-{a.server_id} 재시작")
+
+    def stop(self):
+        self._timer.stop()
+        for sid in self._touched:
+            self._injector.revert_all(sid)
+            self._docker.start(sid)  # 정지돼 있었다면 복구(이미 떠 있으면 무해)
+        self.log.emit("카오스 중지 — 전체 원복")
+        self._touched.clear()
+        self.finished.emit()
