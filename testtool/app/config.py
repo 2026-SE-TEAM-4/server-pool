@@ -11,17 +11,10 @@ SERVER_IDS = [1, 2, 3, 4, 5, 6]
 AGENT_HOST = "127.0.0.1"
 BASE_PORT = 9100  # 포트 = BASE_PORT + SERVER_ID
 
-# 에이전트가 읽는 GPU 오버라이드 파일(agent/collectors/gpu.py와 동일 경로).
+# 에이전트가 읽는 오버라이드 파일(agent/collectors/*.py와 동일 경로).
 GPU_OVERRIDE_PATH = "/tmp/agent_gpu_override"
-
-# 부하 프로세스 식별 센티넬(중지 시 pkill -f 매칭). CPU/RAM 분리.
-CPU_LOAD_SENTINEL = "testtool_cpu_load"
-RAM_LOAD_SENTINEL = "testtool_ram_load"
-
-# RAM 부하 안전 예산: 100%일 때 컨테이너 안에서 할당할 MB.
-# 스펙 RAM(수백 GB)을 그대로 쓰면 호스트가 OOM되므로 안전한 상한을 둔다.
-# 실부하라 보고되는 호스트 RAM%는 정확히 목표치가 되지 않는다(의도된 현실성).
-RAM_LOAD_MB_PER_100 = 2048
+CPU_OVERRIDE_PATH = "/tmp/agent_cpu_override"
+MEM_OVERRIDE_PATH = "/tmp/agent_mem_override"
 
 # 폴링 주기(ms).
 POLL_INTERVAL_MS = 2500
