@@ -1,6 +1,6 @@
 """부하 주입: CPU/RAM/GPU 모두 오버라이드 파일로 통일.
 
-에이전트 수집기는 METRIC_SIMULATE 기본 시뮬레이션 상태에서도 오버라이드 파일이
+에이전트 수집기는 어느 모드(stable/real/randomwalk)에서든 오버라이드 파일이
 있으면 그 값을 우선한다. 테스트 툴은 docker exec로 컨테이너 안에 오버라이드 파일을
 쓰거나(set) 지운다(clear). build_* 는 순수 함수라 docker 없이 테스트한다.
 """
