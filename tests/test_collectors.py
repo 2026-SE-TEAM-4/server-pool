@@ -92,3 +92,29 @@ def test_mem_override_ignored_when_out_of_range(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(mem_mod, "MEM_OVERRIDE_PATH", str(override))
     value = mem_mod.read_mem_usage()
     assert 0.0 <= value <= 100.0
+
+
+from agent import sim as sim_mod
+
+
+def test_cpu_override_wins_in_every_mode(tmp_path, monkeypatch):
+    override = tmp_path / "cpu_ov"
+    override.write_text("88.0")
+    mode_file = tmp_path / "mode"
+    monkeypatch.setattr(cpu_mod, "CPU_OVERRIDE_PATH", str(override))
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(mode_file))
+    for mode in ("stable", "real", "randomwalk"):
+        mode_file.write_text(mode)
+        assert cpu_mod.read_cpu_usage() == 88.0
+
+
+def test_cpu_stable_uses_baseline_and_stays_in_range(tmp_path, monkeypatch):
+    baseline = tmp_path / "cpu_base"
+    baseline.write_text("80")
+    monkeypatch.setattr(cpu_mod, "CPU_BASELINE_PATH", str(baseline))
+    monkeypatch.setattr(cpu_mod, "CPU_OVERRIDE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "DEFAULT_MODE", "stable")
+    values = [cpu_mod.read_cpu_usage() for _ in range(150)]
+    assert all(5.0 <= v <= 95.0 for v in values)
+    assert 60.0 <= (sum(values) / len(values)) <= 95.0
