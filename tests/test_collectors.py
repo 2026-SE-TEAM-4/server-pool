@@ -22,7 +22,11 @@ def test_mem_usage_in_range() -> None:
     assert 0.0 <= value <= 100.0
 
 
-def test_net_usage_in_range() -> None:
+def test_net_usage_in_range(monkeypatch) -> None:
+    import agent.collectors.net as net_mod
+    from agent import sim as sim_mod
+    monkeypatch.setattr(sim_mod, "current_mode", lambda: "real")
+    net_mod._last_sample = None
     read_net_usage()  # 첫 호출은 기준점만 잡는다.
     value = read_net_usage()
     assert isinstance(value, float)
@@ -160,3 +164,23 @@ def test_gpu_stable_in_range(tmp_path, monkeypatch):
     monkeypatch.setattr(sim_mod, "DEFAULT_MODE", "stable")
     values = [gpu_mod.read_gpu_usage() for _ in range(120)]
     assert all(v is not None and 0.0 <= v <= 100.0 for v in values)
+
+
+import agent.collectors.net as net_mod
+
+
+def test_net_override_wins(tmp_path, monkeypatch):
+    override = tmp_path / "net_ov"
+    override.write_text("33.0")
+    monkeypatch.setattr(net_mod, "NET_OVERRIDE_PATH", str(override))
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(tmp_path / "absent"))
+    assert net_mod.read_net_usage() == 33.0
+
+
+def test_net_stable_in_range(tmp_path, monkeypatch):
+    monkeypatch.setattr(net_mod, "NET_OVERRIDE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(net_mod, "NET_BASELINE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "DEFAULT_MODE", "stable")
+    values = [net_mod.read_net_usage() for _ in range(120)]
+    assert all(0.0 <= v <= 100.0 for v in values)
