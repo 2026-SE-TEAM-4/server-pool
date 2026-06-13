@@ -39,7 +39,7 @@ def test_apply_methods_target_correct_override_paths():
     assert any(config.GPU_OVERRIDE_PATH in j for j in joined)
 
 
-def test_revert_all_clears_three_paths():
+def test_revert_all_clears_all_override_paths():
     docker = MagicMock()
     inj = li.LoadInjector(docker)
     inj.revert_all(1)
@@ -47,3 +47,4 @@ def test_revert_all_clears_three_paths():
     assert any(config.CPU_OVERRIDE_PATH in c and "rm" in c for c in cmds)
     assert any(config.MEM_OVERRIDE_PATH in c and "rm" in c for c in cmds)
     assert any(config.GPU_OVERRIDE_PATH in c and "rm" in c for c in cmds)
+    assert any(config.NET_OVERRIDE_PATH in c and "rm" in c for c in cmds)
