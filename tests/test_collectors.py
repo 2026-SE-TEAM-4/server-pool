@@ -118,3 +118,20 @@ def test_cpu_stable_uses_baseline_and_stays_in_range(tmp_path, monkeypatch):
     values = [cpu_mod.read_cpu_usage() for _ in range(150)]
     assert all(5.0 <= v <= 95.0 for v in values)
     assert 60.0 <= (sum(values) / len(values)) <= 95.0
+
+
+def test_mem_override_wins(tmp_path, monkeypatch):
+    override = tmp_path / "mem_ov"
+    override.write_text("55.0")
+    monkeypatch.setattr(mem_mod, "MEM_OVERRIDE_PATH", str(override))
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(tmp_path / "absent"))
+    assert mem_mod.read_mem_usage() == 55.0
+
+
+def test_mem_stable_in_range(tmp_path, monkeypatch):
+    monkeypatch.setattr(mem_mod, "MEM_OVERRIDE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(mem_mod, "MEM_BASELINE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "DEFAULT_MODE", "stable")
+    values = [mem_mod.read_mem_usage() for _ in range(120)]
+    assert all(10.0 <= v <= 90.0 for v in values)
