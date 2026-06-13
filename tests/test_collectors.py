@@ -135,3 +135,28 @@ def test_mem_stable_in_range(tmp_path, monkeypatch):
     monkeypatch.setattr(sim_mod, "DEFAULT_MODE", "stable")
     values = [mem_mod.read_mem_usage() for _ in range(120)]
     assert all(10.0 <= v <= 90.0 for v in values)
+
+
+def test_gpu_real_mode_returns_none(tmp_path, monkeypatch):
+    mode_file = tmp_path / "mode"
+    mode_file.write_text("real")
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(mode_file))
+    monkeypatch.setattr(gpu_mod, "GPU_SIMULATE", True)
+    monkeypatch.setattr(gpu_mod, "GPU_OVERRIDE_PATH", str(tmp_path / "absent"))
+    assert gpu_mod.read_gpu_usage() is None
+
+
+def test_gpu_disabled_always_none(tmp_path, monkeypatch):
+    monkeypatch.setattr(gpu_mod, "GPU_SIMULATE", False)
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(tmp_path / "absent"))
+    assert gpu_mod.read_gpu_usage() is None
+
+
+def test_gpu_stable_in_range(tmp_path, monkeypatch):
+    monkeypatch.setattr(gpu_mod, "GPU_SIMULATE", True)
+    monkeypatch.setattr(gpu_mod, "GPU_OVERRIDE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(gpu_mod, "GPU_BASELINE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "MODE_PATH", str(tmp_path / "absent"))
+    monkeypatch.setattr(sim_mod, "DEFAULT_MODE", "stable")
+    values = [gpu_mod.read_gpu_usage() for _ in range(120)]
+    assert all(v is not None and 0.0 <= v <= 100.0 for v in values)
