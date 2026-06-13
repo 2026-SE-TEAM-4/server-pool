@@ -44,9 +44,15 @@ class LoadInjector:
     def clear_gpu(self, server_id: int) -> None:
         self._docker.exec_run(server_id, build_clear_cmd(config.GPU_OVERRIDE_PATH))
 
+    def apply_net(self, server_id: int, pct: int) -> None:
+        self._docker.exec_run(server_id, build_set_cmd(config.NET_OVERRIDE_PATH, pct))
+
+    def clear_net(self, server_id: int) -> None:
+        self._docker.exec_run(server_id, build_clear_cmd(config.NET_OVERRIDE_PATH))
+
     def revert_all(self, server_id: int) -> None:
-        """한 서버의 CPU/RAM/GPU 오버라이드를 모두 지운다. 개별 실패는 무시."""
-        for fn in (self.clear_cpu, self.clear_ram, self.clear_gpu):
+        """한 서버의 CPU/RAM/GPU/Net 오버라이드를 모두 지운다. 개별 실패는 무시."""
+        for fn in (self.clear_cpu, self.clear_ram, self.clear_gpu, self.clear_net):
             try:
                 fn(server_id)
             except Exception:

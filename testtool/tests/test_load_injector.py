@@ -1,7 +1,12 @@
 from unittest.mock import MagicMock
 
-from app import config
+from app import config, load_injector
 from app import load_injector as li
+
+
+def test_build_set_cmd_for_net():
+    cmd = load_injector.build_set_cmd(config.NET_OVERRIDE_PATH, 70)
+    assert cmd == ["sh", "-c", f"echo 70 > {config.NET_OVERRIDE_PATH}"]
 
 
 def test_set_cmd_writes_value_to_path():
