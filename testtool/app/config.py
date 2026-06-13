@@ -16,6 +16,16 @@ GPU_OVERRIDE_PATH = "/tmp/agent_gpu_override"
 CPU_OVERRIDE_PATH = "/tmp/agent_cpu_override"
 MEM_OVERRIDE_PATH = "/tmp/agent_mem_override"
 
+# 모드 토글 파일(agent/sim.py와 동일 경로).
+MODE_PATH = "/tmp/agent_mode"
+NET_OVERRIDE_PATH = "/tmp/agent_net_override"
+
+# 자원별 기준선(시드) 파일(stable 모드 중심값).
+CPU_BASELINE_PATH = "/tmp/agent_cpu_baseline"
+MEM_BASELINE_PATH = "/tmp/agent_mem_baseline"
+GPU_BASELINE_PATH = "/tmp/agent_gpu_baseline"
+NET_BASELINE_PATH = "/tmp/agent_net_baseline"
+
 # 폴링 주기(ms).
 POLL_INTERVAL_MS = 2500
 
