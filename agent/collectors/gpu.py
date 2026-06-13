@@ -13,6 +13,7 @@ docker exec로 직접 못 바꾼다). GPU_OVERRIDE_PATH 파일이 있으면 그 
 FastAPI 제어 라우터를 추가하지 않고 가장 가벼운 IPC로 끝내기 위해서다.
 """
 
+import hashlib
 import random
 
 from agent.config import GPU_SIMULATE, SERVER_ID
@@ -20,9 +21,8 @@ from agent.config import GPU_SIMULATE, SERVER_ID
 # 테스트 툴이 docker exec로 기록하는 오버라이드 파일 경로.
 GPU_OVERRIDE_PATH = "/tmp/agent_gpu_override"
 
-# 서버마다 다른 곡선을 그리도록 SERVER_ID로 시드한 난수원. 직전 값 주변에서
-# 완만히 움직이는 합성 사용률을 유지한다(0~100 범위).
-_rng = random.Random(SERVER_ID)
+# 네임스페이스 해시로 시드를 만들어 서버 ID가 커질수록 수치도 커지는 단조성을 깬다.
+_rng = random.Random(int(hashlib.sha256(f"gpu:{SERVER_ID}".encode()).hexdigest(), 16))
 _value = _rng.uniform(20.0, 80.0)
 
 

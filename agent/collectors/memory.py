@@ -1,5 +1,6 @@
 """메모리 사용률 수집기."""
 
+import hashlib
 import random
 
 import psutil
@@ -9,8 +10,8 @@ from agent.config import METRIC_SIMULATE, SERVER_ID
 # 테스트 툴이 docker exec로 기록하는 오버라이드 파일 경로.
 MEM_OVERRIDE_PATH = "/tmp/agent_mem_override"
 
-# SERVER_ID + 20: GPU(+0), CPU(+10) 시드와 겹치지 않도록 오프셋 적용.
-_rng = random.Random(SERVER_ID + 20)
+# 네임스페이스 해시로 시드를 만들어 서버 ID가 커질수록 수치도 커지는 단조성을 깬다.
+_rng = random.Random(int(hashlib.sha256(f"mem:{SERVER_ID}".encode()).hexdigest(), 16))
 _value = _rng.uniform(20.0, 75.0)
 
 

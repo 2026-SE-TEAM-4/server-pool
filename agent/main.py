@@ -3,6 +3,7 @@
 백엔드(SYS 수집기)가 1분 주기로 PULL해 갈 대상 서버 한 대를 흉내낸다.
 /metrics는 collectors가 측정한 현재 사용률 스냅샷을 반환하며, 필드·단위 계약의
 단일 출처는 diagram-and-docs/serverpool-spec.html(서버 풀 명세서)이다.
+/info는 정적 하드웨어 사양을 반환한다(config.py의 SERVER_SPECS에서 읽음).
 """
 
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ from agent.collectors.cpu import read_cpu_usage
 from agent.collectors.gpu import read_gpu_usage
 from agent.collectors.memory import read_mem_usage
 from agent.collectors.net import read_net_usage
-from agent.config import SERVER_ID
+from agent.config import SERVER_ID, SPEC
 
 app = FastAPI(title=f"server-pool agent #{SERVER_ID}")
 
@@ -21,6 +22,16 @@ app = FastAPI(title=f"server-pool agent #{SERVER_ID}")
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/info")
+async def info() -> dict:
+    """정적 하드웨어 사양을 반환한다.
+
+    백엔드 시드 스크립트나 관리 툴에서 서버 정보를 조회할 때 사용한다.
+    값은 config.SERVER_SPECS에 정의된 상수이며 런타임에 변하지 않는다.
+    """
+    return {"serverId": SERVER_ID, **SPEC}
 
 
 @app.get("/metrics")

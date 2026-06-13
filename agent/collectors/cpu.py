@@ -1,5 +1,6 @@
 """CPU 사용률 수집기."""
 
+import hashlib
 import random
 
 import psutil
@@ -9,8 +10,8 @@ from agent.config import METRIC_SIMULATE, SERVER_ID
 # 테스트 툴이 docker exec로 기록하는 오버라이드 파일 경로.
 CPU_OVERRIDE_PATH = "/tmp/agent_cpu_override"
 
-# SERVER_ID + 10: GPU 시드(SERVER_ID)와 겹치지 않도록 오프셋 적용.
-_rng = random.Random(SERVER_ID + 10)
+# 네임스페이스 해시로 시드를 만들어 서버 ID가 커질수록 수치도 커지는 단조성을 깬다.
+_rng = random.Random(int(hashlib.sha256(f"cpu:{SERVER_ID}".encode()).hexdigest(), 16))
 _value = _rng.uniform(5.0, 70.0)
 
 
